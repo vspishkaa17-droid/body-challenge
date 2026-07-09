@@ -141,7 +141,6 @@ function renderLeaderboard(rows) {
       <div class="rank ${rankClass}">${index + 1}</div>
       <div>
         <div class="leaderboard-name">${row.participant_name}${isMe ? ' (вы)' : ''}</div>
-        <div class="week-range">${row.activity_count} записей</div>
       </div>
       <div class="leaderboard-points">${row.monthly_points} очк.</div>
     `;
