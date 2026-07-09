@@ -1,38 +1,35 @@
-// Замените на данные из Supabase → Project Settings → API
+// Supabase → Project Settings → API
 export const SUPABASE_URL = 'https://gwpgkuamevvnmvwqlino.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_9HwCRBcIoRyFiarHoEGGIQ_V-6c5VKl';
 
-export const DAILY_GOAL = 100;
+export const PARTICIPANTS = [
+  'Влад',
+  'Маша',
+  'Алекс',
+  'Дима',
+];
 
-export const ACTIVITY_WEIGHTS = {
-  pushups: 2,
-  squats: 1.5,
-  steps: 0.005,
-  workout: 3,
-  run: 10,
-  plank: 0.5,
+export const MONTHLY_GOAL = 100;
+
+// Бинарные активности: сделано = фиксированные очки
+export const BINARY_ACTIVITIES = ['workout', 'training', 'pushups', 'stretching'];
+
+export const ACTIVITY_POINTS = {
+  workout: 1,
+  pushups: 1,
+  stretching: 1,
+  training: 3,
 };
+
+export const STEPS_PER_POINT = 10000;
 
 export const ACTIVITY_LABELS = {
-  pushups: 'Отжимания',
-  squats: 'Приседания',
-  steps: 'Шаги',
   workout: 'Зарядка',
-  run: 'Бег',
-  plank: 'Планка',
+  training: 'Тренировка',
+  pushups: 'Отжимания',
+  stretching: 'Растяжка',
+  steps: 'Шаги',
 };
-
-export const BODY_PARTS = [
-  { id: 'head', threshold: 10 },
-  { id: 'neck', threshold: 15 },
-  { id: 'torso', threshold: 40 },
-  { id: 'leftArm', threshold: 50 },
-  { id: 'rightArm', threshold: 60 },
-  { id: 'leftLeg', threshold: 75 },
-  { id: 'rightLeg', threshold: 90 },
-  { id: 'leftHand', threshold: 95 },
-  { id: 'rightHand', threshold: 100 },
-];
 
 export function isConfigured() {
   return (
@@ -41,4 +38,12 @@ export function isConfigured() {
     SUPABASE_ANON_KEY.length > 20 &&
     !SUPABASE_ANON_KEY.includes('YOUR_')
   );
+}
+
+export function isValidParticipant(name) {
+  return PARTICIPANTS.includes(name);
+}
+
+export function isBinaryActivity(type) {
+  return BINARY_ACTIVITIES.includes(type);
 }

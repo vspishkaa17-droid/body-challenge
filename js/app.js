@@ -1,54 +1,49 @@
 import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
-  DAILY_GOAL,
+  MONTHLY_GOAL,
   ACTIVITY_LABELS,
+  PARTICIPANTS,
+  STEPS_PER_POINT,
   isConfigured,
+  isValidParticipant,
+  isBinaryActivity,
 } from './config.js';
 import {
   calculatePoints,
-  getFilledParts,
   getProgressPercent,
   getTodayDate,
-  getWeekRange,
+  getMonthRange,
   formatActivityLabel,
+  formatActivityDate,
 } from './points.js';
 import { renderBody } from './body.js';
 
-const authScreen = document.getElementById('auth-screen');
+const STORAGE_KEY = 'body-challenge-participant';
+
+const pickerScreen = document.getElementById('picker-screen');
 const mainScreen = document.getElementById('main-screen');
 const setupScreen = document.getElementById('setup-screen');
-const authError = document.getElementById('auth-error');
+const participantList = document.getElementById('participant-list');
 const welcomeText = document.getElementById('welcome-text');
 const bodyContainer = document.getElementById('body-container');
 const progressPercent = document.getElementById('progress-percent');
 const progressFill = document.getElementById('progress-fill');
-const pointsTodayEl = document.getElementById('points-today');
-const dailyGoalEl = document.getElementById('daily-goal');
+const pointsMonthEl = document.getElementById('points-month');
+const monthlyGoalEl = document.getElementById('monthly-goal');
 const completionMessage = document.getElementById('completion-message');
 const activityList = document.getElementById('activity-list');
 const leaderboardEl = document.getElementById('leaderboard');
 const leaderboardEmpty = document.getElementById('leaderboard-empty');
-const weekRangeEl = document.getElementById('week-range');
+const monthRangeEl = document.getElementById('month-range');
 const toastEl = document.getElementById('toast');
 
 let supabase = null;
-let currentUser = null;
-let currentProfile = null;
+let currentParticipant = null;
 
 function showScreen(screen) {
-  [authScreen, mainScreen, setupScreen].forEach((el) => el.classList.add('hidden'));
+  [pickerScreen, mainScreen, setupScreen].forEach((el) => el.classList.add('hidden'));
   screen.classList.remove('hidden');
-}
-
-function showError(message) {
-  authError.textContent = message;
-  authError.classList.remove('hidden');
-}
-
-function clearError() {
-  authError.textContent = '';
-  authError.classList.add('hidden');
 }
 
 function showToast(message) {
@@ -60,33 +55,54 @@ function showToast(message) {
 function formatNetworkError(err) {
   const message = err?.message ?? String(err);
   if (message.includes('Failed to fetch')) {
-    return 'Не удалось связаться с Supabase. Проверьте ключ API, URL сайта в Supabase и что проект не на паузе.';
+    return 'Не удалось связаться с Supabase. Проверьте ключи в config.js.';
   }
   return message;
 }
 
+function getSavedParticipant() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  return isValidParticipant(saved) ? saved : null;
+}
+
+function saveParticipant(name) {
+  localStorage.setItem(STORAGE_KEY, name);
+  currentParticipant = name;
+}
+
+function renderParticipantPicker() {
+  participantList.innerHTML = '';
+
+  PARTICIPANTS.forEach((name) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn participant-btn';
+    button.textContent = name;
+    button.addEventListener('click', () => {
+      saveParticipant(name);
+      openMainScreen();
+    });
+    participantList.appendChild(button);
+  });
+}
+
 function updateBodyUI(totalPoints) {
   const percent = getProgressPercent(totalPoints);
-  const filledParts = getFilledParts(totalPoints);
 
-  renderBody(bodyContainer, filledParts);
+  renderBody(bodyContainer, totalPoints);
   progressPercent.textContent = `${percent}%`;
   progressFill.style.width = `${percent}%`;
-  pointsTodayEl.textContent = String(totalPoints);
-  dailyGoalEl.textContent = String(DAILY_GOAL);
+  pointsMonthEl.textContent = String(totalPoints);
+  monthlyGoalEl.textContent = String(MONTHLY_GOAL);
 
-  if (percent >= 100) {
-    completionMessage.classList.remove('hidden');
-  } else {
-    completionMessage.classList.add('hidden');
-  }
+  completionMessage.classList.toggle('hidden', percent < 100);
 }
 
 function renderActivities(activities) {
   activityList.innerHTML = '';
 
   if (!activities.length) {
-    activityList.innerHTML = '<li class="empty">Пока нет активности за сегодня. Начни с первого упражнения!</li>';
+    activityList.innerHTML = '<li class="empty">Пока нет активности в этом месяце. Начни с первого упражнения!</li>';
     return;
   }
 
@@ -94,7 +110,7 @@ function renderActivities(activities) {
     const li = document.createElement('li');
     li.className = 'activity-item';
     li.innerHTML = `
-      <span>${ACTIVITY_LABELS[activity.type] ?? activity.type}: ${formatActivityLabel(activity.type, activity.amount)}</span>
+      <span>${formatActivityDate(activity.activity_date)} · ${ACTIVITY_LABELS[activity.type] ?? activity.type}: ${formatActivityLabel(activity.type, activity.amount)}</span>
       <span class="points">+${activity.points}</span>
     `;
     activityList.appendChild(li);
@@ -114,39 +130,29 @@ function renderLeaderboard(rows) {
   rows.forEach((row, index) => {
     const li = document.createElement('li');
     const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : '';
-    const isMe = row.user_id === currentUser?.id;
+    const isMe = row.participant_name === currentParticipant;
 
     li.className = `leaderboard-item${isMe ? ' me' : ''}`;
     li.innerHTML = `
       <div class="rank ${rankClass}">${index + 1}</div>
       <div>
-        <div class="leaderboard-name">${row.display_name}${isMe ? ' (вы)' : ''}</div>
+        <div class="leaderboard-name">${row.participant_name}${isMe ? ' (вы)' : ''}</div>
         <div class="week-range">${row.activity_count} записей</div>
       </div>
-      <div class="leaderboard-points">${row.weekly_points} очк.</div>
+      <div class="leaderboard-points">${row.monthly_points} очк.</div>
     `;
     leaderboardEl.appendChild(li);
   });
 }
 
-async function loadProfile(userId) {
+async function loadMonthActivities() {
+  const month = getMonthRange();
   const { data, error } = await supabase
-    .from('profiles')
-    .select('id, display_name')
-    .eq('id', userId)
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-async function loadTodayActivities() {
-  const today = getTodayDate();
-  const { data, error } = await supabase
-    .from('activities')
-    .select('id, type, amount, points, created_at')
-    .eq('user_id', currentUser.id)
-    .eq('activity_date', today)
+    .from('challenge_activities')
+    .select('id, type, amount, points, activity_date, created_at')
+    .eq('participant_name', currentParticipant)
+    .gte('activity_date', month.start)
+    .lte('activity_date', month.end)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -154,35 +160,68 @@ async function loadTodayActivities() {
 }
 
 async function loadLeaderboard() {
-  const week = getWeekRange();
-  weekRangeEl.textContent = week.label;
+  const month = getMonthRange();
+  monthRangeEl.textContent = month.label;
 
-  const { data, error } = await supabase.rpc('weekly_leaderboard', {
-    week_start: week.start,
-    week_end: week.end,
+  const { data, error } = await supabase.rpc('weekly_leaderboard_simple', {
+    week_start: month.start,
+    week_end: month.end,
   });
 
   if (error) throw error;
-  return data ?? [];
+
+  return (data ?? []).map((row) => ({
+    ...row,
+    monthly_points: row.weekly_points,
+  }));
 }
 
-async function refreshDashboard() {
-  const activities = await loadTodayActivities();
-  const totalPoints = activities.reduce((sum, item) => sum + Number(item.points), 0);
+async function loadTodayBinaryDone() {
+  const today = getTodayDate();
+  const { data, error } = await supabase
+    .from('challenge_activities')
+    .select('type')
+    .eq('participant_name', currentParticipant)
+    .eq('activity_date', today)
+    .in('type', ['workout', 'training', 'pushups', 'stretching']);
 
-  updateBodyUI(totalPoints);
-  renderActivities(activities);
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => row.type));
+}
 
-  const leaderboard = await loadLeaderboard();
-  renderLeaderboard(leaderboard);
+function updateBinaryButtons(doneToday) {
+  document.querySelectorAll('.btn.action').forEach((button) => {
+    const type = button.dataset.type;
+    const label = button.dataset.label;
+    const done = doneToday.has(type);
+
+    button.disabled = done;
+    button.classList.toggle('done', done);
+    button.textContent = done ? `✓ ${label}` : `+ ${label}`;
+  });
 }
 
 async function addActivity(type, amount) {
   const points = calculatePoints(type, amount);
+
+  if (type === 'steps' && points <= 0) {
+    showToast(`Минимум ${STEPS_PER_POINT.toLocaleString('ru-RU')} шагов для 1 балла`);
+    return;
+  }
+
+  if (isBinaryActivity(type)) {
+    const doneToday = await loadTodayBinaryDone();
+    if (doneToday.has(type)) {
+      showToast('Уже отмечено сегодня');
+      return;
+    }
+    amount = 1;
+  }
+
   const today = getTodayDate();
 
-  const { error } = await supabase.from('activities').insert({
-    user_id: currentUser.id,
+  const { error } = await supabase.from('challenge_activities').insert({
+    participant_name: currentParticipant,
     type,
     amount,
     points,
@@ -191,21 +230,28 @@ async function addActivity(type, amount) {
 
   if (error) throw error;
 
-  showToast(`+${points} очков`);
+  showToast(`+${points} ${points === 1 ? 'балл' : 'балла'}`);
   await refreshDashboard();
 }
 
-async function handleAuthSession(session) {
-  if (!session?.user) {
-    currentUser = null;
-    currentProfile = null;
-    showScreen(authScreen);
-    return;
-  }
+async function refreshDashboard() {
+  const activities = await loadMonthActivities();
+  const totalPoints = activities.reduce((sum, item) => sum + Number(item.points), 0);
 
-  currentUser = session.user;
-  currentProfile = await loadProfile(currentUser.id);
-  welcomeText.textContent = `Привет, ${currentProfile.display_name}!`;
+  updateBodyUI(totalPoints);
+  renderActivities(activities);
+
+  const doneToday = await loadTodayBinaryDone();
+  updateBinaryButtons(doneToday);
+
+  const leaderboard = await loadLeaderboard();
+  renderLeaderboard(leaderboard);
+}
+
+async function openMainScreen() {
+  const month = getMonthRange();
+  document.getElementById('month-title').textContent = month.label;
+  welcomeText.textContent = `Привет, ${currentParticipant}!`;
   showScreen(mainScreen);
   await refreshDashboard();
 }
@@ -216,95 +262,52 @@ async function init() {
     return;
   }
 
+  if (!PARTICIPANTS.length) {
+    setupScreen.querySelector('.setup-steps').innerHTML =
+      '<li>Добавьте имена участников в <code>js/config.js</code></li>';
+    showScreen(setupScreen);
+    return;
+  }
+
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const { data } = await supabase.auth.getSession();
-  await handleAuthSession(data.session);
+  renderParticipantPicker();
 
-  supabase.auth.onAuthStateChange((_event, session) => {
-    handleAuthSession(session).catch((err) => showError(err.message));
-  });
-
-  document.getElementById('login-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearError();
-
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        showError(error.message);
-      }
-    } catch (err) {
-      showError(formatNetworkError(err));
-    }
-  });
-
-  document.getElementById('register-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearError();
-
-    const displayName = document.getElementById('register-name').value.trim();
-    const email = document.getElementById('register-email').value.trim();
-    const password = document.getElementById('register-password').value;
-
-    if (!email.includes('@') || !email.includes('.')) {
-      showError('Укажите настоящий email, например: vlad@gmail.com');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { display_name: displayName },
-        },
-      });
-      if (error) {
-        showError(error.message);
-        return;
-      }
-
-      if (data.session) {
-        showToast('Аккаунт создан!');
-      } else {
-        showToast('Аккаунт создан. Проверьте email, если включено подтверждение.');
-      }
-    } catch (err) {
-      showError(formatNetworkError(err));
-    }
-  });
-
-  document.getElementById('logout-btn').addEventListener('click', async () => {
-    await supabase.auth.signOut();
+  document.getElementById('change-user-btn').addEventListener('click', () => {
+    showScreen(pickerScreen);
   });
 
   document.querySelectorAll('.btn.action').forEach((button) => {
     button.addEventListener('click', async () => {
       try {
-        await addActivity(button.dataset.type, Number(button.dataset.amount));
+        await addActivity(button.dataset.type, 1);
       } catch (err) {
-        showToast(err.message);
+        showToast(formatNetworkError(err));
       }
     });
   });
 
-  document.getElementById('custom-activity-form').addEventListener('submit', async (event) => {
+  document.getElementById('steps-form').addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    const type = document.getElementById('activity-type').value;
-    const amount = Number(document.getElementById('activity-amount').value);
+    const amount = Number(document.getElementById('steps-amount').value);
 
     try {
-      await addActivity(type, amount);
+      await addActivity('steps', amount);
       event.target.reset();
     } catch (err) {
-      showToast(err.message);
+      showToast(formatNetworkError(err));
     }
   });
+
+  const saved = getSavedParticipant();
+  if (saved) {
+    currentParticipant = saved;
+    await openMainScreen();
+    return;
+  }
+
+  showScreen(pickerScreen);
 }
 
 init().catch((err) => {
