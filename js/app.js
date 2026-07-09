@@ -189,16 +189,47 @@ async function loadTodayBinaryDone() {
   return new Set((data ?? []).map((row) => row.type));
 }
 
-function updateBinaryButtons(doneToday) {
+function countActivitiesByType(activities) {
+  const counts = {
+    workout: 0,
+    training: 0,
+    pushups: 0,
+    stretching: 0,
+    steps: 0,
+  };
+  let totalSteps = 0;
+
+  activities.forEach((activity) => {
+    if (activity.type in counts) {
+      counts[activity.type] += 1;
+    }
+    if (activity.type === 'steps') {
+      totalSteps += Number(activity.amount);
+    }
+  });
+
+  return { counts, totalSteps };
+}
+
+function updateBinaryButtons(doneToday, counts) {
   document.querySelectorAll('.btn.action').forEach((button) => {
     const type = button.dataset.type;
     const label = button.dataset.label;
     const done = doneToday.has(type);
+    const total = counts[type] ?? 0;
 
     button.disabled = done;
     button.classList.toggle('done', done);
-    button.textContent = done ? `✓ ${label}` : `+ ${label}`;
+    button.textContent = `${done ? '✓' : '+'} ${label} (${total})`;
   });
+}
+
+function updateStepsLabel(counts, totalSteps) {
+  const label = document.getElementById('steps-label');
+  if (!label) return;
+
+  const entries = counts.steps ?? 0;
+  label.textContent = `Шаги (10 000 = 1 балл) (${entries}) · всего ${totalSteps.toLocaleString('ru-RU')}`;
 }
 
 async function addActivity(type, amount) {
@@ -241,8 +272,10 @@ async function refreshDashboard() {
   updateBodyUI(totalPoints);
   renderActivities(activities);
 
+  const { counts, totalSteps } = countActivitiesByType(activities);
   const doneToday = await loadTodayBinaryDone();
-  updateBinaryButtons(doneToday);
+  updateBinaryButtons(doneToday, counts);
+  updateStepsLabel(counts, totalSteps);
 
   const leaderboard = await loadLeaderboard();
   renderLeaderboard(leaderboard);
