@@ -1,5 +1,5 @@
 // Замените на данные из Supabase → Project Settings → API
-export const SUPABASE_URL = 'https://gwpgkuamevvnmuwqlino.supabase.co';
+export const SUPABASE_URL = 'https://gwpgkuamevvnmvwqlino.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_9HwCRBcIoRyFiarHoEGGIQ_V-6c5VKl';
 
 export const DAILY_GOAL = 100;
