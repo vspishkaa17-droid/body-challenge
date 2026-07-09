@@ -4,68 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Body Challenge — групповой челлендж</title>
-  <meta name="description" content="Закрашивай тело за активность и соревнуйся с друзьями в недельном рейтинге." />
+  <meta name="description" content="Наполняй бокал за активность и соревнуйся с друзьями в месячном рейтинге." />
   <link rel="stylesheet" href="css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 </head>
 <body>
   <div id="app">
-    <!-- Auth screen -->
-    <section id="auth-screen" class="screen hidden">
+    <!-- Выбор участника -->
+    <section id="picker-screen" class="screen hidden">
       <div class="card auth-card">
         <h1>Body Challenge</h1>
-        <p class="subtitle">Групповой челлендж: закрашивай тело и соревнуйся с друзьями</p>
-
-        <div id="auth-error" class="error hidden"></div>
-
-        <form id="login-form" class="auth-form">
-          <h2>Вход</h2>
-          <label>
-            Email
-            <input type="email" id="login-email" required autocomplete="email" />
-          </label>
-          <label>
-            Пароль
-            <input type="password" id="login-password" required autocomplete="current-password" />
-          </label>
-          <button type="submit" class="btn primary">Войти</button>
-        </form>
-
-        <hr />
-
-        <form id="register-form" class="auth-form">
-          <h2>Регистрация</h2>
-          <label>
-            Имя в рейтинге
-            <input type="text" id="register-name" required maxlength="30" placeholder="Алекс" />
-          </label>
-          <label>
-            Email
-            <input type="email" id="register-email" required autocomplete="email" />
-          </label>
-          <label>
-            Пароль
-            <input type="password" id="register-password" required minlength="6" autocomplete="new-password" />
-          </label>
-          <button type="submit" class="btn secondary">Создать аккаунт</button>
-        </form>
+        <p class="subtitle">Выберите себя, чтобы отметить активность за месяц</p>
+        <div id="participant-list" class="participant-list"></div>
       </div>
     </section>
 
-    <!-- Main app -->
+    <!-- Главный экран -->
     <section id="main-screen" class="screen hidden">
       <header class="header">
         <div>
           <h1>Body Challenge</h1>
           <p id="welcome-text" class="welcome"></p>
         </div>
-        <button id="logout-btn" class="btn ghost">Выйти</button>
+        <button id="change-user-btn" class="btn ghost">Сменить имя</button>
       </header>
 
       <main class="layout">
         <section class="card body-card">
           <div class="body-header">
-            <h2>Сегодня</h2>
+            <h2 id="month-title">Этот месяц</h2>
             <span id="progress-percent" class="badge">0%</span>
           </div>
 
@@ -73,62 +40,61 @@
 
           <div class="progress-wrap">
             <div class="progress-label">
-              <span id="points-today">0</span> / <span id="daily-goal">100</span> очков
+              <span id="points-month">0</span> / <span id="monthly-goal">100</span> очков за месяц
             </div>
             <div class="progress-bar">
               <div id="progress-fill" class="progress-fill"></div>
             </div>
           </div>
 
-          <p id="completion-message" class="completion hidden">Тело полностью заряжено!</p>
+          <p id="completion-message" class="completion hidden">Бокал полностью налит!</p>
         </section>
 
         <section class="card">
           <h2>Добавить активность</h2>
           <div class="quick-actions">
-            <button class="btn action" data-type="pushups" data-amount="10">+10 отжиманий</button>
-            <button class="btn action" data-type="squats" data-amount="20">+20 приседаний</button>
-            <button class="btn action" data-type="workout" data-amount="5">+5 мин зарядки</button>
-            <button class="btn action" data-type="plank" data-amount="30">+30 сек планки</button>
+            <button class="btn action" data-type="workout" data-label="Зарядка">+ Зарядка</button>
+            <button class="btn action" data-type="training" data-label="Тренировка">+ Тренировка</button>
+            <button class="btn action" data-type="pushups" data-label="Отжимания">+ Отжимания</button>
+            <button class="btn action" data-type="stretching" data-label="Растяжка">+ Растяжка</button>
           </div>
 
-          <form id="custom-activity-form" class="custom-form">
-            <select id="activity-type" required>
-              <option value="pushups">Отжимания</option>
-              <option value="squats">Приседания</option>
-              <option value="steps">Шаги</option>
-              <option value="workout">Зарядка (мин)</option>
-              <option value="run">Бег (км)</option>
-              <option value="plank">Планка (сек)</option>
-            </select>
-            <input type="number" id="activity-amount" min="1" required placeholder="Кол-во" />
-            <button type="submit" class="btn primary">Добавить</button>
+          <form id="steps-form" class="steps-form">
+            <label for="steps-amount">Шаги (10 000 = 1 балл)</label>
+            <div class="steps-row">
+              <input type="number" id="steps-amount" min="1" step="1" required placeholder="Например: 12000" />
+              <button type="submit" class="btn primary">Добавить шаги</button>
+            </div>
           </form>
 
+          <p class="points-hint">Зарядка, отжимания, растяжка — 1 балл · Тренировка — 3 балла</p>
+
+          <h2>Активность за месяц</h2>
           <ul id="activity-list" class="activity-list"></ul>
         </section>
 
         <section class="card leaderboard-card">
           <div class="leaderboard-header">
-            <h2>Рейтинг недели</h2>
-            <span id="week-range" class="week-range"></span>
+            <h2>Рейтинг месяца</h2>
+            <span id="month-range" class="week-range"></span>
           </div>
           <ol id="leaderboard" class="leaderboard"></ol>
-          <p id="leaderboard-empty" class="empty hidden">Пока никто не добавил активность на этой неделе.</p>
+          <p id="leaderboard-empty" class="empty hidden">Пока никто не добавил активность в этом месяце.</p>
         </section>
       </main>
     </section>
 
-    <!-- Setup screen -->
-    <section id="setup-screen" class="screen">
+    <!-- Настройка Supabase -->
+    <section id="setup-screen" class="screen hidden">
       <div class="card auth-card">
         <h1>Нужна настройка Supabase</h1>
-        <p>Откройте <code>js/config.js</code> и вставьте URL и anon key из вашего проекта Supabase.</p>
+        <p>На сайте не указаны ключи Supabase. Их нужно вставить в <code>js/config.js</code> на GitHub и задеплоить заново.</p>
         <ol class="setup-steps">
-          <li>Создайте проект на <a href="https://supabase.com" target="_blank" rel="noreferrer">supabase.com</a></li>
-          <li>Выполните SQL из файла <code>supabase/schema.sql</code></li>
-          <li>Скопируйте Project URL и anon key в <code>js/config.js</code></li>
-          <li>Обновите страницу</li>
+          <li>Supabase → <strong>SQL Editor</strong> → выполните <code>supabase/schema-simple.sql</code></li>
+          <li>Supabase → <strong>Project Settings → API</strong> → скопируйте URL и <strong>Publishable key</strong> целиком</li>
+          <li>GitHub → репозиторий <code>body-challenge</code> → файл <code>js/config.js</code> → Edit</li>
+          <li>Вставьте ключи → <strong>Commit changes</strong></li>
+          <li>Vercel → <strong>Redeploy</strong> → обновите страницу (Ctrl+F5)</li>
         </ol>
       </div>
     </section>
