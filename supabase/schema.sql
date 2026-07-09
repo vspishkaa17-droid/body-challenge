@@ -103,7 +103,8 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1))
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update
+    set display_name = excluded.display_name;
 
   return new;
 end;

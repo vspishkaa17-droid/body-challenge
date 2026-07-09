@@ -1,53 +1,60 @@
-import { ACTIVITY_WEIGHTS, BODY_PARTS, DAILY_GOAL } from './config.js';
+import {
+  ACTIVITY_POINTS,
+  STEPS_PER_POINT,
+  MONTHLY_GOAL,
+  isBinaryActivity,
+} from './config.js';
 
 export function calculatePoints(type, amount) {
-  const weight = ACTIVITY_WEIGHTS[type] ?? 1;
-  return Math.round(amount * weight * 10) / 10;
-}
+  if (type === 'steps') {
+    return Math.floor(amount / STEPS_PER_POINT);
+  }
 
-export function getFilledParts(totalPoints) {
-  return BODY_PARTS.filter((part) => totalPoints >= part.threshold).map((part) => part.id);
+  if (isBinaryActivity(type)) {
+    return ACTIVITY_POINTS[type] ?? 0;
+  }
+
+  return 0;
 }
 
 export function getProgressPercent(totalPoints) {
-  return Math.min(Math.round((totalPoints / DAILY_GOAL) * 100), 100);
+  return Math.min(Math.round((totalPoints / MONTHLY_GOAL) * 100), 100);
 }
 
 export function getTodayDate() {
   return new Date().toISOString().split('T')[0];
 }
 
-export function getWeekRange() {
+export function getMonthRange() {
   const now = new Date();
-  const day = now.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday);
-  monday.setHours(0, 0, 0, 0);
-
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-
-  const format = (date) =>
-    date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  const toIso = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   return {
-    start: monday.toISOString().split('T')[0],
-    end: sunday.toISOString().split('T')[0],
-    label: `${format(monday)} — ${format(sunday)}`,
+    start: toIso(start),
+    end: toIso(end),
+    label: now.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }),
   };
 }
 
 export function formatActivityLabel(type, amount) {
-  const units = {
-    pushups: 'повт.',
-    squats: 'повт.',
-    steps: 'шагов',
-    workout: 'мин',
-    run: 'км',
-    plank: 'сек',
-  };
+  if (type === 'steps') {
+    return `${amount} шагов`;
+  }
 
-  return `${amount} ${units[type] ?? ''}`.trim();
+  return 'Сделано';
+}
+
+export function formatActivityDate(dateStr) {
+  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  });
 }

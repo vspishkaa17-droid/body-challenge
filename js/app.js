@@ -312,5 +312,9 @@ async function init() {
 
 init().catch((err) => {
   console.error(err);
-  showScreen(setupScreen);
+  if (!isConfigured()) {
+    showScreen(setupScreen);
+    return;
+  }
+  showToast(formatNetworkError(err));
 });
