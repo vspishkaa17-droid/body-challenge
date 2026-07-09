@@ -3,10 +3,9 @@ export const SUPABASE_URL = 'https://gwpgkuamevvnmvwqlino.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_9HwCRBcIoRyFiarHoEGGIQ_V-6c5VKl';
 
 export const PARTICIPANTS = [
+  'Наташа',
+  'Яна',
   'Влад',
-  'Маша',
-  'Алекс',
-  'Дима',
 ];
 
 export const MONTHLY_GOAL = 100;
