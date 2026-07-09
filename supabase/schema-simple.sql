@@ -6,7 +6,7 @@ create table if not exists public.challenge_activities (
   participant_name text not null check (char_length(participant_name) between 2 and 30),
   type text not null check (type in ('workout', 'training', 'pushups', 'stretching', 'steps')),
   amount numeric not null check (amount > 0),
-  points numeric not null check (points > 0),
+  points numeric not null check (points >= 0),
   activity_date date not null default current_date,
   created_at timestamptz not null default now()
 );
@@ -36,6 +36,13 @@ create policy "Anyone can delete challenge activities"
   on public.challenge_activities for delete
   to anon, authenticated
   using (true);
+
+drop policy if exists "Anyone can update challenge activities" on public.challenge_activities;
+create policy "Anyone can update challenge activities"
+  on public.challenge_activities for update
+  to anon, authenticated
+  using (true)
+  with check (true);
 
 create or replace function public.weekly_leaderboard_simple(week_start date, week_end date)
 returns table (

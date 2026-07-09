@@ -1,19 +1,30 @@
 import { MONTHLY_GOAL } from './config.js';
 
 const SLICES = MONTHLY_GOAL;
-const GLASS_TOP = 92;
-const GLASS_BOTTOM = 346;
+const GLASS_TOP = 108;
+const GLASS_BOTTOM = 352;
 const GLASS_HEIGHT = GLASS_BOTTOM - GLASS_TOP;
 
 function renderSliceLines(filledCount) {
   return Array.from({ length: SLICES - 1 }, (_, index) => {
     const level = index + 1;
-    const y = GLASS_BOTTOM - (GLASS_HEIGHT * level) / SLICES;
-    const opacity = level <= filledCount ? 0.16 : 0;
-    if (opacity === 0) return '';
+    if (level > filledCount) return '';
 
-    return `<line x1="66" y1="${y}" x2="134" y2="${y}" stroke="rgba(0,0,0,0.22)" stroke-width="0.6" opacity="${opacity}" />`;
+    const y = GLASS_BOTTOM - (GLASS_HEIGHT * level) / SLICES;
+    return `<line x1="62" y1="${y}" x2="138" y2="${y}" stroke="rgba(62,26,0,0.18)" stroke-width="0.55" />`;
   }).join('');
+}
+
+function renderBubbles(filledCount) {
+  if (filledCount <= 0) return '';
+
+  const fillY = GLASS_BOTTOM - (GLASS_HEIGHT * filledCount) / SLICES;
+  return `
+    <circle cx="92" cy="${fillY + 40}" r="1.6" fill="rgba(255,255,255,0.35)" />
+    <circle cx="108" cy="${fillY + 70}" r="1.2" fill="rgba(255,255,255,0.28)" />
+    <circle cx="98" cy="${fillY + 110}" r="1.8" fill="rgba(255,255,255,0.22)" />
+    <circle cx="112" cy="${fillY + 55}" r="1" fill="rgba(255,255,255,0.3)" />
+  `;
 }
 
 export function renderBody(container, totalPoints) {
@@ -22,47 +33,74 @@ export function renderBody(container, totalPoints) {
   const fillHeight = (GLASS_HEIGHT * filledCount) / SLICES;
   const fillY = GLASS_BOTTOM - fillHeight;
   const showFoam = filledCount > 0;
+  const uid = `glass-${Date.now()}`;
 
   container.innerHTML = `
     <div class="glass-widget" aria-label="Прогресс за месяц — бокал пива">
       <svg class="glass-svg" viewBox="0 0 200 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Бокал пива">
         <defs>
-          <clipPath id="beer-inner">
-            <path d="M 78 346 C 66 292 62 236 66 188 C 70 140 78 104 100 98 C 122 104 130 140 134 188 C 138 236 134 292 122 346 Z" />
+          <clipPath id="${uid}-inner">
+            <path d="M 82 350 C 70 300 66 245 70 198 C 74 152 82 118 100 112 C 118 118 126 152 130 198 C 134 245 130 300 118 350 Z" />
           </clipPath>
-          <clipPath id="beer-level">
+          <clipPath id="${uid}-level">
             <rect x="0" y="${fillY}" width="200" height="${fillHeight + 1}" />
           </clipPath>
-          <linearGradient id="beer-gradient" x1="0%" y1="100%" x2="0%" y2="0%">
-            <stop offset="0%" stop-color="#b45309" />
-            <stop offset="45%" stop-color="#f59e0b" />
-            <stop offset="100%" stop-color="#fde68a" />
+          <linearGradient id="${uid}-beer" x1="0%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="#92400e" />
+            <stop offset="35%" stop-color="#d97706" />
+            <stop offset="75%" stop-color="#fbbf24" />
+            <stop offset="100%" stop-color="#fef3c7" />
           </linearGradient>
-          <linearGradient id="glass-light" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="rgba(255,255,255,0.35)" />
-            <stop offset="40%" stop-color="rgba(255,255,255,0.03)" />
-            <stop offset="100%" stop-color="rgba(255,255,255,0.18)" />
+          <linearGradient id="${uid}-glass" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="rgba(255,255,255,0.42)" />
+            <stop offset="18%" stop-color="rgba(255,255,255,0.08)" />
+            <stop offset="55%" stop-color="rgba(255,255,255,0.03)" />
+            <stop offset="82%" stop-color="rgba(255,255,255,0.12)" />
+            <stop offset="100%" stop-color="rgba(255,255,255,0.32)" />
           </linearGradient>
+          <radialGradient id="${uid}-shine" cx="28%" cy="22%" r="55%">
+            <stop offset="0%" stop-color="rgba(255,255,255,0.55)" />
+            <stop offset="100%" stop-color="rgba(255,255,255,0)" />
+          </radialGradient>
         </defs>
 
-        <g clip-path="url(#beer-inner)">
-          <g clip-path="url(#beer-level)">
-            <rect x="58" y="${GLASS_TOP}" width="84" height="${GLASS_HEIGHT}" fill="url(#beer-gradient)" />
+        <ellipse cx="100" cy="368" rx="34" ry="7" fill="rgba(0,0,0,0.28)" />
+
+        <path
+          d="M 72 356 C 56 295 52 230 58 172 C 64 118 76 84 100 78 C 124 84 136 118 142 172 C 148 230 144 295 128 356 C 100 368 72 356 72 356 Z"
+          fill="rgba(255,255,255,0.04)"
+          stroke="rgba(255,255,255,0.18)"
+          stroke-width="1.5"
+        />
+
+        <g clip-path="url(#${uid}-inner)">
+          <g clip-path="url(#${uid}-level)">
+            <rect x="54" y="${GLASS_TOP}" width="92" height="${GLASS_HEIGHT}" fill="url(#${uid}-beer)" />
             ${renderSliceLines(filledCount)}
+            ${renderBubbles(filledCount)}
           </g>
-          ${showFoam ? `<ellipse cx="100" cy="${fillY + 2}" rx="24" ry="5.5" fill="#fff9ef" opacity="0.95" />` : ''}
+          ${showFoam ? `
+            <ellipse cx="100" cy="${fillY + 3}" rx="26" ry="6" fill="#fffdf7" opacity="0.96" />
+            <ellipse cx="100" cy="${fillY + 1}" rx="18" ry="3" fill="#ffffff" opacity="0.55" />
+          ` : ''}
         </g>
 
         <path
-          d="M 68 352 C 54 288 52 224 58 168 C 64 118 76 82 100 76 C 124 82 136 118 142 168 C 148 224 146 288 132 352 C 100 362 68 352 68 352 Z"
-          fill="url(#glass-light)"
-          stroke="rgba(255,255,255,0.72)"
-          stroke-width="2.2"
+          d="M 72 356 C 56 295 52 230 58 172 C 64 118 76 84 100 78 C 124 84 136 118 142 172 C 148 230 144 295 128 356 C 100 368 72 356 72 356 Z"
+          fill="url(#${uid}-glass)"
+          stroke="rgba(255,255,255,0.78)"
+          stroke-width="2.4"
         />
-        <ellipse cx="100" cy="76" rx="36" ry="9" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.65)" stroke-width="2" />
-        <path d="M 82 78 L 82 350" stroke="rgba(255,255,255,0.22)" stroke-width="2" stroke-linecap="round" />
-        <path d="M 118 110 Q 100 118 82 110" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1.2" />
-        <path d="M 116 230 Q 100 238 84 230" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
+        <path
+          d="M 72 356 C 56 295 52 230 58 172 C 64 118 76 84 100 78 C 124 84 136 118 142 172 C 148 230 144 295 128 356 Z"
+          fill="url(#${uid}-shine)"
+          stroke="none"
+        />
+        <ellipse cx="100" cy="78" rx="38" ry="10" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.72)" stroke-width="2.2" />
+        <ellipse cx="100" cy="356" rx="30" ry="8" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" />
+        <path d="M 86 92 L 86 352" stroke="rgba(255,255,255,0.28)" stroke-width="2.3" stroke-linecap="round" />
+        <path d="M 114 130 Q 100 138 86 130" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="1.2" />
+        <path d="M 112 236 Q 100 244 88 236" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1" />
       </svg>
       <p class="glass-caption">${filledCount} / ${SLICES} за месяц · ${percent}%</p>
     </div>

@@ -5,9 +5,13 @@ import {
   isBinaryActivity,
 } from './config.js';
 
-export function calculatePoints(type, amount) {
+export function calculatePoints(type, amount, previousStepTotal = 0) {
   if (type === 'steps') {
-    return Math.floor(amount / STEPS_PER_POINT);
+    const nextTotal = previousStepTotal + amount;
+    return (
+      Math.floor(nextTotal / STEPS_PER_POINT) -
+      Math.floor(previousStepTotal / STEPS_PER_POINT)
+    );
   }
 
   if (isBinaryActivity(type)) {
@@ -57,4 +61,9 @@ export function formatActivityDate(dateStr) {
     day: 'numeric',
     month: 'short',
   });
+}
+
+export function stepsUntilNextPoint(totalSteps) {
+  const remainder = totalSteps % STEPS_PER_POINT;
+  return remainder === 0 ? STEPS_PER_POINT : STEPS_PER_POINT - remainder;
 }

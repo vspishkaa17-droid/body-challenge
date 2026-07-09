@@ -16,6 +16,7 @@ import {
   getMonthRange,
   formatActivityLabel,
   formatActivityDate,
+  stepsUntilNextPoint,
 } from './points.js';
 import { renderBody } from './body.js';
 
@@ -112,7 +113,7 @@ function renderActivities(activities) {
     li.innerHTML = `
       <span class="activity-text">${formatActivityDate(activity.activity_date)} · ${ACTIVITY_LABELS[activity.type] ?? activity.type}: ${formatActivityLabel(activity.type, activity.amount)}</span>
       <div class="activity-actions">
-        <span class="points">+${activity.points}</span>
+        <span class="points">${activity.type === 'steps' && Number(activity.points) === 0 ? '—' : `+${activity.points}`}</span>
         <button type="button" class="btn-delete" data-delete-id="${activity.id}" aria-label="Удалить активность">×</button>
       </div>
     `;
@@ -232,29 +233,111 @@ function updateStepsLabel(counts, totalSteps) {
   if (!label) return;
 
   const entries = counts.steps ?? 0;
-  label.textContent = `Шаги (10 000 = 1 балл) (${entries}) · всего ${totalSteps.toLocaleString('ru-RU')}`;
+  const untilNext = stepsUntilNextPoint(totalSteps);
+  label.textContent = `Шаги — 10 000 = 1 балл (${entries}) · всего ${totalSteps.toLocaleString('ru-RU')} · до балла ${untilNext.toLocaleString('ru-RU')}`;
+}
+
+async function getMonthStepTotal() {
+  const month = getMonthRange();
+  const { data, error } = await supabase
+    .from('challenge_activities')
+    .select('amount')
+    .eq('participant_name', currentParticipant)
+    .eq('type', 'steps')
+    .gte('activity_date', month.start)
+    .lte('activity_date', month.end);
+
+  if (error) throw error;
+  return (data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
+}
+
+async function recalculateStepPointsForMonth() {
+  const month = getMonthRange();
+  const { data: steps, error } = await supabase
+    .from('challenge_activities')
+    .select('id, amount, created_at')
+    .eq('participant_name', currentParticipant)
+    .eq('type', 'steps')
+    .gte('activity_date', month.start)
+    .lte('activity_date', month.end)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  let cumulative = 0;
+  let awarded = 0;
+
+  for (const step of steps ?? []) {
+    cumulative += Number(step.amount);
+    const shouldHave = Math.floor(cumulative / STEPS_PER_POINT);
+    const entryPoints = shouldHave - awarded;
+    awarded = shouldHave;
+
+    const { error: updateError } = await supabase
+      .from('challenge_activities')
+      .update({ points: entryPoints })
+      .eq('id', step.id);
+
+    if (updateError) throw updateError;
+  }
 }
 
 async function deleteActivity(id) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('challenge_activities')
     .delete()
     .eq('id', id)
-    .eq('participant_name', currentParticipant);
+    .eq('participant_name', currentParticipant)
+    .select('id, type');
 
   if (error) throw error;
+
+  if (!data?.length) {
+    throw new Error('Не удалось удалить. Выполните supabase/fix-delete-and-steps.sql в Supabase.');
+  }
+
+  const hadSteps = data.some((row) => row.type === 'steps');
+  if (hadSteps) {
+    await recalculateStepPointsForMonth();
+  }
 
   showToast('Активность удалена');
   await refreshDashboard();
 }
 
 async function addActivity(type, amount) {
-  const points = calculatePoints(type, amount);
+  if (type === 'steps') {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast('Укажите количество шагов');
+      return;
+    }
 
-  if (type === 'steps' && points <= 0) {
-    showToast(`Минимум ${STEPS_PER_POINT.toLocaleString('ru-RU')} шагов для 1 балла`);
+    const previousStepTotal = await getMonthStepTotal();
+    const points = calculatePoints(type, amount, previousStepTotal);
+    const today = getTodayDate();
+
+    const { error } = await supabase.from('challenge_activities').insert({
+      participant_name: currentParticipant,
+      type,
+      amount,
+      points,
+      activity_date: today,
+    });
+
+    if (error) throw error;
+
+    if (points > 0) {
+      showToast(`+${points} ${points === 1 ? 'балл' : 'балла'} за шаги`);
+    } else {
+      const total = previousStepTotal + amount;
+      showToast(`Шаги сохранены · до балла ${stepsUntilNextPoint(total).toLocaleString('ru-RU')}`);
+    }
+
+    await refreshDashboard();
     return;
   }
+
+  const points = calculatePoints(type, amount);
 
   if (isBinaryActivity(type)) {
     const doneToday = await loadTodayBinaryDone();
