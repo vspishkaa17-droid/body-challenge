@@ -57,6 +57,14 @@ function showToast(message) {
   setTimeout(() => toastEl.classList.add('hidden'), 2200);
 }
 
+function formatNetworkError(err) {
+  const message = err?.message ?? String(err);
+  if (message.includes('Failed to fetch')) {
+    return 'Не удалось связаться с Supabase. Проверьте ключ API, URL сайта в Supabase и что проект не на паузе.';
+  }
+  return message;
+}
+
 function updateBodyUI(totalPoints) {
   const percent = getProgressPercent(totalPoints);
   const filledParts = getFilledParts(totalPoints);
@@ -224,8 +232,14 @@ async function init() {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) showError(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        showError(error.message);
+      }
+    } catch (err) {
+      showError(formatNetworkError(err));
+    }
   });
 
   document.getElementById('register-form').addEventListener('submit', async (event) => {
@@ -236,25 +250,32 @@ async function init() {
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) {
-      showError(error.message);
+    if (!email.includes('@') || !email.includes('.')) {
+      showError('Укажите настоящий email, например: vlad@gmail.com');
       return;
     }
 
-    if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: data.user.id,
-        display_name: displayName,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { display_name: displayName },
+        },
       });
-
-      if (profileError) {
-        showError(profileError.message);
+      if (error) {
+        showError(error.message);
         return;
       }
-    }
 
-    showToast('Аккаунт создан. Проверьте email, если включено подтверждение.');
+      if (data.session) {
+        showToast('Аккаунт создан!');
+      } else {
+        showToast('Аккаунт создан. Проверьте email, если включено подтверждение.');
+      }
+    } catch (err) {
+      showError(formatNetworkError(err));
+    }
   });
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
