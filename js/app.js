@@ -269,7 +269,14 @@ async function init() {
     return;
   }
 
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  supabase = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  if (!supabase) {
+    participantList.innerHTML =
+      '<p class="empty">Не загрузилась библиотека Supabase. Отключите блокировщик рекламы или попробуйте другой браузер, затем обновите страницу.</p>';
+    showScreen(pickerScreen);
+    return;
+  }
 
   renderParticipantPicker();
 
@@ -316,5 +323,6 @@ init().catch((err) => {
     showScreen(setupScreen);
     return;
   }
+  showScreen(pickerScreen);
   showToast(formatNetworkError(err));
 });
