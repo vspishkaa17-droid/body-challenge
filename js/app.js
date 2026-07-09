@@ -110,8 +110,11 @@ function renderActivities(activities) {
     const li = document.createElement('li');
     li.className = 'activity-item';
     li.innerHTML = `
-      <span>${formatActivityDate(activity.activity_date)} · ${ACTIVITY_LABELS[activity.type] ?? activity.type}: ${formatActivityLabel(activity.type, activity.amount)}</span>
-      <span class="points">+${activity.points}</span>
+      <span class="activity-text">${formatActivityDate(activity.activity_date)} · ${ACTIVITY_LABELS[activity.type] ?? activity.type}: ${formatActivityLabel(activity.type, activity.amount)}</span>
+      <div class="activity-actions">
+        <span class="points">+${activity.points}</span>
+        <button type="button" class="btn-delete" data-delete-id="${activity.id}" aria-label="Удалить активность">×</button>
+      </div>
     `;
     activityList.appendChild(li);
   });
@@ -232,6 +235,19 @@ function updateStepsLabel(counts, totalSteps) {
   label.textContent = `Шаги (10 000 = 1 балл) (${entries}) · всего ${totalSteps.toLocaleString('ru-RU')}`;
 }
 
+async function deleteActivity(id) {
+  const { error } = await supabase
+    .from('challenge_activities')
+    .delete()
+    .eq('id', id)
+    .eq('participant_name', currentParticipant);
+
+  if (error) throw error;
+
+  showToast('Активность удалена');
+  await refreshDashboard();
+}
+
 async function addActivity(type, amount) {
   const points = calculatePoints(type, amount);
 
@@ -335,6 +351,17 @@ async function init() {
     try {
       await addActivity('steps', amount);
       event.target.reset();
+    } catch (err) {
+      showToast(formatNetworkError(err));
+    }
+  });
+
+  activityList.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-delete-id]');
+    if (!button) return;
+
+    try {
+      await deleteActivity(button.dataset.deleteId);
     } catch (err) {
       showToast(formatNetworkError(err));
     }

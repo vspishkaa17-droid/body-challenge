@@ -221,10 +221,10 @@ select {
 }
 
 .glass-svg {
-  width: min(190px, 48vw);
+  width: min(210px, 52vw);
   height: auto;
   display: block;
-  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.4));
 }
 
 .glass-fill-track,
@@ -336,15 +336,47 @@ select {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   padding: 10px 12px;
   background: #0f172a;
   border-radius: 10px;
   border: 1px solid var(--card-border);
 }
 
+.activity-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .activity-item .points {
   color: var(--success);
   font-weight: 700;
+}
+
+.btn-delete {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: #1e293b;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.btn-delete:hover {
+  color: var(--danger);
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.12);
 }
 
 .leaderboard {

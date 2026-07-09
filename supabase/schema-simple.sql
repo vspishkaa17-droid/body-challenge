@@ -31,6 +31,12 @@ create policy "Anyone can insert challenge activities"
   to anon, authenticated
   with check (true);
 
+drop policy if exists "Anyone can delete challenge activities" on public.challenge_activities;
+create policy "Anyone can delete challenge activities"
+  on public.challenge_activities for delete
+  to anon, authenticated
+  using (true);
+
 create or replace function public.weekly_leaderboard_simple(week_start date, week_end date)
 returns table (
   participant_name text,
